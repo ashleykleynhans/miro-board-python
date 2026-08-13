@@ -38,6 +38,9 @@ import os
 import sys
 from typing import Any, Dict, List
 
+from rich.console import Console
+from rich.markup import escape
+
 from miro_client import MiroClient, MiroError, SHAPE_TYPES
 
 STICKY_COLORS = {
@@ -220,21 +223,29 @@ def main(argv: List[str]) -> int:
         specs = [spec_from_args(args)]
 
     client = MiroClient(args.token)
+    console = Console()
+    error_console = Console(stderr=True)
     created: List[Dict[str, Any]] = []
     for i, spec in enumerate(specs):
         try:
             if args.dry_run:
-                print(f"[dry-run] would create {spec['type']}")
+                console.print(f"dry-run: would create {escape(spec['type'])}")
                 created.append({"id": f"(dry-run {i})", "type": spec["type"]})
             else:
                 item = create_from_dict(client, args.board_id, spec)
                 created.append(item)
-                print(f"created {item.get('type')} {item['id']}")
+                console.print(
+                    f"[green]created[/green] {escape(str(item.get('type')))} "
+                    f"{escape(str(item['id']))}"
+                )
         except MiroError as exc:
-            print(f"error on item {i} ({spec.get('type')}): {exc}", file=sys.stderr)
+            error_console.print(
+                f"[red]error on item {i} ({escape(str(spec.get('type', '?')))}):[/red] "
+                f"{escape(str(exc))}"
+            )
             return 1
 
-    print(f"Done. Created {len(created)} item(s).")
+    console.print(f"[green]Done.[/green] Created {len(created)} item(s).")
     return 0
 
 

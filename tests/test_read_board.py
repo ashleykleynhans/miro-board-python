@@ -17,7 +17,7 @@ def run_main(monkeypatch, argv, responses=None):
 
 def test_summarizes_board(monkeypatch, capsys):
     responses = [
-        FakeResponse(200, {"id": "b", "name": "My Board", "size": {"width": 1000, "height": 800}}),
+        FakeResponse(200, {"id": "b", "name": "My Board"}),
         FakeResponse(200, {
             "data": [
                 {"id": "1", "type": "sticky_note", "data": {"content": "Hello world"}},

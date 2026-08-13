@@ -106,7 +106,7 @@ def test_batch_dry_run(tmp_path, monkeypatch, capsys):
     )
     assert code == 0
     assert session.calls == []
-    assert "[dry-run] would run 'delete' on 1" in capsys.readouterr().out
+    assert "would run 'delete' on 1" in capsys.readouterr().out
 
 
 def test_batch_unsupported_op(tmp_path, monkeypatch, capsys):

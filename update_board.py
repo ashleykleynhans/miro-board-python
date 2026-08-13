@@ -31,17 +31,24 @@ import os
 import sys
 from typing import Any, Dict, List
 
+from rich.console import Console
+from rich.markup import escape
+
 from miro_client import MiroClient, MiroError
 
 
 def apply_op(
-    client: MiroClient, board_id: str, op: Dict[str, Any], dry_run: bool
+    client: MiroClient,
+    board_id: str,
+    op: Dict[str, Any],
+    dry_run: bool,
+    console: Console,
 ) -> None:
     """Apply a single operation from the batch file to the board."""
     operation = op["op"]
     item_id = op["item_id"]
     if dry_run:
-        print(f"[dry-run] would run '{operation}' on {item_id}")
+        console.print(f"dry-run: would run {operation!r} on {escape(str(item_id))}")
         return
 
     if operation == "set-text":
@@ -69,7 +76,7 @@ def apply_op(
         )
     else:
         raise MiroError(f"unsupported operation in file: {operation!r}")
-    print(f"{operation} {item_id} -> ok")
+    console.print(f"[green]{operation}[/green] {escape(str(item_id))} -> ok")
 
 
 def main(argv: List[str]) -> int:
@@ -116,37 +123,39 @@ def main(argv: List[str]) -> int:
         parser.error("missing subcommand (set-text, set-color, resize, move, tag, delete, or update)")
 
     client = MiroClient(args.token)
+    console = Console()
+    error_console = Console(stderr=True)
     try:
         if args.command == "set-text":
             client.set_sticky_note_text(args.board_id, args.item_id, args.content)
-            print(f"set-text {args.item_id} -> ok")
+            console.print(f"[green]set-text[/green] {escape(str(args.item_id))} -> ok")
         elif args.command == "set-color":
             client.set_item_color(args.board_id, args.item_id, args.color)
-            print(f"set-color {args.item_id} -> ok")
+            console.print(f"[green]set-color[/green] {escape(str(args.item_id))} -> ok")
         elif args.command == "resize":
             client.resize_item(args.board_id, args.item_id, width=args.width, height=args.height)
-            print(f"resize {args.item_id} -> ok")
+            console.print(f"[green]resize[/green] {escape(str(args.item_id))} -> ok")
         elif args.command == "move":
             client.move_item(args.board_id, args.item_id, x=args.x, y=args.y)
-            print(f"move {args.item_id} -> ok")
+            console.print(f"[green]move[/green] {escape(str(args.item_id))} -> ok")
         elif args.command == "tag":
             client.assign_tag(args.board_id, args.item_id, args.tag_id)
-            print(f"tag {args.item_id} -> ok")
+            console.print(f"[green]tag[/green] {escape(str(args.item_id))} -> ok")
         elif args.command == "delete":
             client.delete_item(args.board_id, args.item_id)
-            print(f"delete {args.item_id} -> ok")
+            console.print(f"[green]delete[/green] {escape(str(args.item_id))} -> ok")
         else:
             with open(args.file) as handle:
                 ops = json.load(handle)
             if not isinstance(ops, list):
                 parser.error("--file must contain a JSON list of operations")
             for op in ops:
-                apply_op(client, args.board_id, op, args.dry_run)
+                apply_op(client, args.board_id, op, args.dry_run, console)
     except MiroError as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        error_console.print(f"[red]error:[/red] {escape(str(exc))}")
         return 1
 
-    print("Done.")
+    console.print("[green]Done.[/green]")
     return 0
 
 

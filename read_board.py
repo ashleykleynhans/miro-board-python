@@ -14,24 +14,35 @@ import os
 import sys
 from typing import Any, Dict, List
 
+from rich.console import Console
+from rich.markup import escape
+from rich.table import Table
+
 from miro_client import MiroClient, MiroError
 
 
-def summarize(board: Dict[str, Any], items: List[Dict[str, Any]]) -> None:
+def summarize(
+    board: Dict[str, Any], items: List[Dict[str, Any]], console: Console
+) -> None:
     """Print a human-readable summary of the board and its items."""
-    print(f"Board: {board.get('name')!r} (id={board['id']})")
-    print(f"Board size: {board.get('size')}")
-    print(f"Items: {len(items)}")
-    print()
-    print(f"{'TYPE':<14} {'ID':<24} CONTENT")
-    print("-" * 80)
+    console.print(
+        f"[bold]Board:[/bold] {escape(str(board.get('name')))} "
+        f"[dim](id={escape(str(board['id']))})[/dim]"
+    )
+    console.print(f"Items: {len(items)}")
+
+    table = Table(title="Items", header_style="bold")
+    table.add_column("TYPE")
+    table.add_column("ID")
+    table.add_column("CONTENT")
     for item in items:
         item_id = item["id"]
         item_type = item.get("type", "?")
         data = item.get("data", {}) or {}
         content = data.get("content") or data.get("title") or ""
         content = " ".join(str(content).split())[:60]
-        print(f"{item_type:<14} {item_id:<24} {content}")
+        table.add_row(item_type, escape(str(item_id)), escape(content))
+    console.print(table)
 
 
 def main(argv: List[str]) -> int:
@@ -57,6 +68,8 @@ def main(argv: List[str]) -> int:
     if not args.board_id:
         parser.error("missing board id (use --board-id or MIRO_BOARD_ID)")
 
+    console = Console()
+    error_console = Console(stderr=True)
     try:
         client = MiroClient(args.token)
         board = client.get_board(args.board_id)
@@ -64,15 +77,15 @@ def main(argv: List[str]) -> int:
         if args.item_type:
             items = [i for i in items if i.get("type") == args.item_type]
     except MiroError as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        error_console.print(f"[red]error:[/red] {escape(str(exc))}")
         return 1
 
     if args.json:
         with open(args.json, "w") as handle:
             json.dump({"board": board, "items": items}, handle, indent=2)
-        print(f"Wrote {len(items)} items to {args.json}")
+        console.print(f"Wrote {len(items)} items to {escape(str(args.json))}")
     else:
-        summarize(board, items)
+        summarize(board, items, console)
     return 0
 
 

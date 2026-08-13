@@ -23,7 +23,7 @@ def test_sticky_dry_run(monkeypatch, capsys):
         ["--board-id", "b", "--token", "t", "sticky", "hi", "--x", "1", "--y", "2", "--color", "red", "--dry-run"],
     )
     assert code == 0
-    assert "[dry-run] would create sticky_note" in capsys.readouterr().out
+    assert "would create sticky_note" in capsys.readouterr().out
 
 
 def test_sticky_create(monkeypatch, capsys):
