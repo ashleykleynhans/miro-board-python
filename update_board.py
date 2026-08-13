@@ -34,7 +34,7 @@ from typing import Any, Dict, List
 from rich.console import Console
 from rich.markup import escape
 
-from miro_client import MiroClient, MiroError
+from miro_client import ITEM_ENDPOINTS, MiroClient, MiroError
 
 
 def apply_op(
@@ -54,10 +54,16 @@ def apply_op(
     if operation == "set-text":
         client.set_sticky_note_text(board_id, item_id, op["content"])
     elif operation == "set-color":
-        client.set_item_color(board_id, item_id, op["color"])
+        client.set_item_color(
+            board_id, item_id, op["color"], item_type=op.get("item_type")
+        )
     elif operation == "resize":
         client.resize_item(
-            board_id, item_id, width=op.get("width"), height=op.get("height")
+            board_id,
+            item_id,
+            width=op.get("width"),
+            height=op.get("height"),
+            item_type=op.get("item_type"),
         )
     elif operation == "move":
         client.move_item(board_id, item_id, x=op["x"], y=op["y"])
@@ -69,10 +75,10 @@ def apply_op(
         client.update_item(
             board_id,
             item_id,
+            item_type=op.get("item_type"),
             data=op.get("data"),
             style=op.get("style"),
             geometry=op.get("geometry"),
-            tag_ids=op.get("tag_ids"),
         )
     else:
         raise MiroError(f"unsupported operation in file: {operation!r}")
@@ -92,11 +98,19 @@ def main(argv: List[str]) -> int:
     set_color = sub.add_parser("set-color", help="set an item's fill color")
     set_color.add_argument("item_id")
     set_color.add_argument("--color", required=True)
+    set_color.add_argument(
+        "--type", dest="item_type", choices=sorted(ITEM_ENDPOINTS),
+        help="item type (omitted when not known: looked up automatically)",
+    )
 
     resize = sub.add_parser("resize", help="resize an item")
     resize.add_argument("item_id")
     resize.add_argument("--width", type=float)
     resize.add_argument("--height", type=float)
+    resize.add_argument(
+        "--type", dest="item_type", choices=sorted(ITEM_ENDPOINTS),
+        help="item type (omitted when not known: looked up automatically)",
+    )
 
     move = sub.add_parser("move", help="move an item to new coordinates")
     move.add_argument("item_id")
@@ -130,10 +144,10 @@ def main(argv: List[str]) -> int:
             client.set_sticky_note_text(args.board_id, args.item_id, args.content)
             console.print(f"[green]set-text[/green] {escape(str(args.item_id))} -> ok")
         elif args.command == "set-color":
-            client.set_item_color(args.board_id, args.item_id, args.color)
+            client.set_item_color(args.board_id, args.item_id, args.color, item_type=args.item_type)
             console.print(f"[green]set-color[/green] {escape(str(args.item_id))} -> ok")
         elif args.command == "resize":
-            client.resize_item(args.board_id, args.item_id, width=args.width, height=args.height)
+            client.resize_item(args.board_id, args.item_id, width=args.width, height=args.height, item_type=args.item_type)
             console.print(f"[green]resize[/green] {escape(str(args.item_id))} -> ok")
         elif args.command == "move":
             client.move_item(args.board_id, args.item_id, x=args.x, y=args.y)

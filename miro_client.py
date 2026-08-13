@@ -5,6 +5,11 @@ reading, creating, updating, and deleting board items.
 
 Requires an access token, obtained from a Miro developer app or board share
 menu, passed either directly or via the MIRO_ACCESS_TOKEN environment variable.
+
+The v2 API uses per-item-type endpoints: sticky notes, cards, shapes, frames,
+images, documents, embeds, and app cards are created and updated through their
+own paths (e.g. POST /boards/{board_id}/sticky_notes) rather than a polymorphic
+/items endpoint.
 """
 
 from __future__ import annotations
@@ -20,21 +25,37 @@ API_BASE = "https://api.miro.com/v2"
 SHAPE_TYPES = {
     "rectangle",
     "round_rectangle",
-    "square",
     "circle",
     "triangle",
+    "rhombus",
+    "parallelogram",
+    "trapezoid",
+    "pentagon",
     "hexagon",
     "octagon",
-    "parallelogram",
+    "wedge_round_rectangle_callout",
     "star",
-    "arrow_right",
-    "pentagon",
-    "diamond",
-    "rhombus",
-    "trapezoid",
-    "triangle_up",
-    "triangle_down",
-    "ellipse",
+    "flow_chart_predefined_process",
+    "cloud",
+    "cross",
+    "can",
+    "right_arrow",
+    "left_arrow",
+    "left_right_arrow",
+    "left_brace",
+    "right_brace",
+}
+
+ITEM_ENDPOINTS = {
+    "sticky_note": "sticky_notes",
+    "card": "cards",
+    "text": "texts",
+    "shape": "shapes",
+    "frame": "frames",
+    "image": "images",
+    "document": "documents",
+    "embed": "embeds",
+    "app_card": "app_cards",
 }
 
 
@@ -75,9 +96,13 @@ class MiroClient:
             break
         if not 200 <= response.status_code < 300:
             detail = response.text[:500]
-            raise MiroError(
-                f"{method} {path} -> HTTP {response.status_code}: {detail}"
-            )
+            if response.status_code == 405:
+                detail += (
+                    " (hint: this endpoint does not support that method; "
+                    "current Miro APIs use per-item-type endpoints such as "
+                    "POST /boards/{board_id}/sticky_notes)"
+                )
+            raise MiroError(f"{method} {path} -> HTTP {response.status_code}: {detail}")
         if not response.content:
             return None
         return response.json()
@@ -95,6 +120,21 @@ class MiroClient:
             cursor = payload.get("cursor")
             if not cursor:
                 break
+
+    def _item_path(self, board_id: str, item_type: str) -> str:
+        """Return the per-type item collection path for an item type."""
+        endpoint = ITEM_ENDPOINTS.get(item_type)
+        if endpoint is None:
+            raise MiroError(f"unsupported item type: {item_type!r}")
+        return f"/boards/{board_id}/{endpoint}"
+
+    def _resolve_item_type(self, board_id: str, item_id: str) -> str:
+        """Look up an item's type so it can be updated via its type endpoint."""
+        item = self.get_item(board_id, item_id)
+        item_type = item.get("type")
+        if item_type not in ITEM_ENDPOINTS:
+            raise MiroError(f"cannot update unsupported item type: {item_type!r}")
+        return item_type
 
     # ------------------------------------------------------------- boards
     def get_board(self, board_id: str) -> Dict[str, Any]:
@@ -127,8 +167,8 @@ class MiroClient:
         geometry: Optional[Dict[str, Any]] = None,
         parent_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Create an item of the given type (sticky_note, card, shape, ...)."""
-        body: Dict[str, Any] = {"type": item_type}
+        """Create an item of the given type via its per-type endpoint."""
+        body: Dict[str, Any] = {}
         for key, value in {
             "data": data,
             "style": style,
@@ -138,7 +178,7 @@ class MiroClient:
         }.items():
             if value is not None:
                 body[key] = value
-        return self._request("POST", f"/boards/{board_id}/items", json=body)
+        return self._request("POST", self._item_path(board_id, item_type), json=body)
 
     def update_item(
         self,
@@ -149,22 +189,28 @@ class MiroClient:
         style: Optional[Dict[str, Any]] = None,
         position: Optional[Dict[str, Any]] = None,
         geometry: Optional[Dict[str, Any]] = None,
-        tag_ids: Optional[List[str]] = None,
+        parent_id: Optional[str] = None,
+        item_type: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Partially update an item. Only supplied fields are changed."""
-        body = {
-            key: value
-            for key, value in {
-                "data": data,
-                "style": style,
-                "position": position,
-                "geometry": geometry,
-                "tagIds": tag_ids,
-            }.items()
-            if value is not None
-        }
+        """Partially update an item through its per-type endpoint.
+
+        Only supplied fields are changed. If item_type is omitted it is
+        resolved from the item itself.
+        """
+        if item_type is None:
+            item_type = self._resolve_item_type(board_id, item_id)
+        body: Dict[str, Any] = {}
+        for key, value in {
+            "data": data,
+            "style": style,
+            "position": position,
+            "geometry": geometry,
+            "parent": {"id": parent_id} if parent_id else None,
+        }.items():
+            if value is not None:
+                body[key] = value
         return self._request(
-            "PATCH", f"/boards/{board_id}/items/{item_id}", json=body
+            "PATCH", f"{self._item_path(board_id, item_type)}/{item_id}", json=body
         )
 
     def delete_item(self, board_id: str, item_id: str) -> None:
@@ -205,7 +251,7 @@ class MiroClient:
         data: Dict[str, Any] = {
             "title": title,
             "description": description,
-            "assignee": {"id": assignee_id} if assignee_id else None,
+            "assigneeId": assignee_id,
         }
         return self.create_item(
             board_id,
@@ -248,7 +294,7 @@ class MiroClient:
         return self.create_item(
             board_id,
             "shape",
-            data={"content": content, "shapeType": shape_type},
+            data={"content": content, "shape": shape_type},
             style={"fillColor": fill_color, "borderColor": border_color},
             position={"x": x, "y": y, "origin": "center"},
             geometry={"width": 160, "height": 80},
@@ -303,7 +349,7 @@ class MiroClient:
         return self.create_item(
             board_id,
             "image",
-            data={"url": url},
+            data={"imageUrl": url},
             position={"x": x, "y": y, "origin": "center"},
             geometry=geometry,
         )
@@ -316,16 +362,12 @@ class MiroClient:
         *,
         x: float = 0.0,
         y: float = 0.0,
-        preview_url: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create a document (link preview) item."""
-        data = {"title": title, "url": url}
-        if preview_url:
-            data["previewUrl"] = preview_url
         return self.create_item(
             board_id,
             "document",
-            data=data,
+            data={"title": title, "documentUrl": url},
             position={"x": x, "y": y, "origin": "center"},
         )
 
@@ -380,25 +422,21 @@ class MiroClient:
         title: str,
         *,
         fill_color: str = "red",
-        text_color: str = "#ffffff",
     ) -> Dict[str, Any]:
-        """Create a tag with the given title and colors."""
+        """Create a tag with the given title and fill color."""
         return self._request(
             "POST",
             f"/boards/{board_id}/tags",
-            json={
-                "tag": {
-                    "title": title,
-                    "fillColor": fill_color,
-                    "textColor": text_color,
-                }
-            },
+            json={"title": title, "fillColor": fill_color},
         )
 
     def assign_tag(self, board_id: str, item_id: str, tag_id: str) -> Dict[str, Any]:
-        """Assign a tag to an item (replaces existing tags on the item)."""
-        return self.update_item(board_id, item_id, tag_ids=[tag_id])
+        """Assign a tag to an item."""
+        return self._request(
+            "POST", f"/boards/{board_id}/items/{item_id}", params={"tag_id": tag_id}
+        )
 
+    # -------------------------------------------------------------- update
     def move_item(
         self,
         board_id: str,
@@ -406,18 +444,21 @@ class MiroClient:
         *,
         x: float,
         y: float,
-        origin: str = "center",
     ) -> Dict[str, Any]:
         """Move an item to new coordinates."""
-        return self.update_item(
-            board_id, item_id, position={"x": x, "y": y, "origin": origin}
+        return self._request(
+            "PATCH",
+            f"/boards/{board_id}/items/{item_id}",
+            json={"position": {"x": x, "y": y}},
         )
 
     def set_sticky_note_text(
         self, board_id: str, item_id: str, content: str
     ) -> Dict[str, Any]:
         """Replace the content of a sticky note."""
-        return self.update_item(board_id, item_id, data={"content": content})
+        return self.update_item(
+            board_id, item_id, item_type="sticky_note", data={"content": content}
+        )
 
     def resize_item(
         self,
@@ -426,20 +467,30 @@ class MiroClient:
         *,
         width: Optional[float] = None,
         height: Optional[float] = None,
+        item_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Resize an item. Omitted dimensions keep their current value."""
-        geometry: Optional[Dict[str, Any]] = {}
+        geometry: Dict[str, Any] = {}
         if width:
             geometry["width"] = width
         if height:
             geometry["height"] = height
-        return self.update_item(board_id, item_id, geometry=geometry or None)
+        return self.update_item(
+            board_id, item_id, item_type=item_type, geometry=geometry or None
+        )
 
     def set_item_color(
-        self, board_id: str, item_id: str, color: str
+        self,
+        board_id: str,
+        item_id: str,
+        color: str,
+        *,
+        item_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Set the fill color of a sticky note or shape."""
-        return self.update_item(board_id, item_id, style={"fillColor": color})
+        return self.update_item(
+            board_id, item_id, item_type=item_type, style={"fillColor": color}
+        )
 
     def update_shape(
         self,
@@ -452,12 +503,12 @@ class MiroClient:
         border_color: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Update the content or style of a shape."""
-        data = {}
+        data: Dict[str, Any] = {}
         if content is not None:
             data["content"] = content
         if shape_type is not None:
-            data["shapeType"] = shape_type
-        style = {}
+            data["shape"] = shape_type
+        style: Dict[str, Any] = {}
         if fill_color is not None:
             style["fillColor"] = fill_color
         if border_color is not None:
@@ -465,6 +516,7 @@ class MiroClient:
         return self.update_item(
             board_id,
             item_id,
+            item_type="shape",
             data=data or None,
             style=style or None,
         )

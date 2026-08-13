@@ -28,7 +28,7 @@ def test_set_text(monkeypatch):
 def test_set_color(monkeypatch):
     code, session = run_main(
         monkeypatch,
-        ["--board-id", "b", "--token", "t", "set-color", "1", "--color", "green"],
+        ["--board-id", "b", "--token", "t", "set-color", "1", "--color", "green", "--type", "sticky_note"],
         [FakeResponse(200, {"id": "1"})],
     )
     assert code == 0
@@ -38,7 +38,7 @@ def test_set_color(monkeypatch):
 def test_resize(monkeypatch):
     code, session = run_main(
         monkeypatch,
-        ["--board-id", "b", "--token", "t", "resize", "1", "--width", "100", "--height", "200"],
+        ["--board-id", "b", "--token", "t", "resize", "1", "--width", "100", "--height", "200", "--type", "shape"],
         [FakeResponse(200, {"id": "1"})],
     )
     assert code == 0
@@ -52,7 +52,7 @@ def test_move(monkeypatch):
         [FakeResponse(200, {"id": "1"})],
     )
     assert code == 0
-    assert session.calls[0]["json"] == {"position": {"x": 5, "y": 6, "origin": "center"}}
+    assert session.calls[0]["json"] == {"position": {"x": 5, "y": 6}}
 
 
 def test_tag(monkeypatch):
@@ -62,7 +62,9 @@ def test_tag(monkeypatch):
         [FakeResponse(200, {"id": "1"})],
     )
     assert code == 0
-    assert session.calls[0]["json"] == {"tagIds": ["9"]}
+    call = session.calls[0]
+    assert call["method"] == "POST"
+    assert call["params"] == {"tag_id": "9"}
 
 
 def test_delete(monkeypatch):
@@ -79,11 +81,11 @@ def test_batch_update(tmp_path, monkeypatch, capsys):
     batch = tmp_path / "changes.json"
     batch.write_text(json.dumps([
         {"op": "set-text", "item_id": "1", "content": "x"},
-        {"op": "set-color", "item_id": "1", "color": "green"},
-        {"op": "resize", "item_id": "1", "width": 100, "height": 200},
+        {"op": "set-color", "item_id": "1", "color": "green", "item_type": "sticky_note"},
+        {"op": "resize", "item_id": "1", "width": 100, "height": 200, "item_type": "shape"},
         {"op": "move", "item_id": "1", "x": 1, "y": 2},
         {"op": "tag", "item_id": "1", "tag_id": "9"},
-        {"op": "update", "item_id": "1", "data": {"content": "z"}, "style": {"fillColor": "red"}, "geometry": {"width": 50}, "tag_ids": ["9"]},
+        {"op": "update", "item_id": "1", "item_type": "shape", "data": {"content": "z"}, "style": {"fillColor": "red"}, "geometry": {"width": 50}},
         {"op": "delete", "item_id": "1"},
     ]))
     responses = [FakeResponse(200, {"id": "1"})] * 6 + [FakeResponse(204)]

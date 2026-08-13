@@ -4,7 +4,7 @@ images, documents, embeds, connectors, and tags.
 Usage:
     python write_board.py --board-id <id> sticky "Hello world" --x 100 --y 200
     python write_board.py --board-id <id> card --title "Task" --description "Do it"
-    python write_board.py --board-id <id> shape "Decision" --shape-type diamond
+    python write_board.py --board-id <id> shape "Decision" --shape-type rhombus
     python write_board.py --board-id <id> frame --title "Section" --width 1000
     python write_board.py --board-id <id> image --url https://example.com/pic.png
     python write_board.py --board-id <id> connector --start-item-id <id> --end-item-id <id>
@@ -18,7 +18,7 @@ JSON file format (a list of items):
        "x": 0, "y": 0},
       {"type": "card", "title": "Task 1", "description": "Do the thing",
        "x": 300, "y": 0},
-      {"type": "shape", "content": "Decision", "shape_type": "diamond",
+      {"type": "shape", "content": "Decision", "shape_type": "rhombus",
        "fill_color": "#ffffff", "border_color": "#1a1a1a", "x": 600, "y": 0},
       {"type": "frame", "title": "Section", "width": 1000, "height": 700},
       {"type": "image", "url": "https://example.com/pic.png",
@@ -100,7 +100,6 @@ def create_from_dict(client: MiroClient, board_id: str, spec: Dict[str, Any]) ->
             board_id,
             spec["title"],
             spec["url"],
-            preview_url=spec.get("preview_url"),
             **kwargs,
         )
     if item_type == "embed":
@@ -123,7 +122,6 @@ def create_from_dict(client: MiroClient, board_id: str, spec: Dict[str, Any]) ->
             board_id,
             spec["title"],
             fill_color=spec.get("fill_color", "red"),
-            text_color=spec.get("text_color", "#ffffff"),
         )
     raise MiroError(f"unsupported item type in file: {item_type!r}")
 
@@ -181,7 +179,6 @@ def main(argv: List[str]) -> int:
     document = sub.add_parser("document", help="create a document link", parents=[common])
     document.add_argument("--title", required=True)
     document.add_argument("--url", required=True)
-    document.add_argument("--preview-url")
     document.add_argument("--x", type=float, default=0.0)
     document.add_argument("--y", type=float, default=0.0)
 
@@ -201,7 +198,6 @@ def main(argv: List[str]) -> int:
     tag = sub.add_parser("tag", help="create a tag", parents=[common])
     tag.add_argument("--title", required=True)
     tag.add_argument("--fill-color", default="red")
-    tag.add_argument("--text-color", default="#ffffff")
 
     parser.add_argument("--file", metavar="JSON", help="create many items from a JSON file")
     parser.add_argument("--dry-run", action="store_true", help="validate without creating")
@@ -264,13 +260,13 @@ def spec_from_args(args: argparse.Namespace) -> Dict[str, Any]:
     if args.command == "image":
         return {"type": "image", "url": args.url, "x": args.x, "y": args.y, "width": args.width, "height": args.height}
     if args.command == "document":
-        return {"type": "document", "title": args.title, "url": args.url, "preview_url": args.preview_url, "x": args.x, "y": args.y}
+        return {"type": "document", "title": args.title, "url": args.url, "x": args.x, "y": args.y}
     if args.command == "embed":
         return {"type": "embed", "url": args.url, "x": args.x, "y": args.y, "width": args.width, "height": args.height}
     if args.command == "connector":
         return {"type": "connector", "start_item_id": args.start_item_id, "end_item_id": args.end_item_id, "caption": args.caption, "color": args.color}
     if args.command == "tag":
-        return {"type": "tag", "title": args.title, "fill_color": args.fill_color, "text_color": args.text_color}
+        return {"type": "tag", "title": args.title, "fill_color": args.fill_color}
     raise MiroError(f"unsupported subcommand: {args.command!r}")
 
 

@@ -39,13 +39,13 @@ def test_sticky_create(monkeypatch, capsys):
 @pytest.mark.parametrize("argv", [
     ["card", "--title", "T", "--description", "D", "--assignee-id", "9", "--x", "1", "--y", "2"],
     ["text", "hello", "--x", "1", "--y", "2"],
-    ["shape", "D", "--shape-type", "diamond", "--fill-color", "#fff", "--border-color", "#000", "--x", "1", "--y", "2"],
+    ["shape", "D", "--shape-type", "rhombus", "--fill-color", "#fff", "--border-color", "#000", "--x", "1", "--y", "2"],
     ["frame", "--title", "F", "--x", "1", "--y", "2", "--width", "1000", "--height", "700"],
     ["image", "--url", "https://x", "--x", "1", "--y", "2", "--width", "400", "--height", "300"],
-    ["document", "--title", "S", "--url", "https://x", "--preview-url", "https://y", "--x", "1", "--y", "2"],
+    ["document", "--title", "S", "--url", "https://x", "--x", "1", "--y", "2"],
     ["embed", "--url", "https://x", "--x", "1", "--y", "2", "--width", "500", "--height", "400"],
     ["connector", "--start-item-id", "1", "--end-item-id", "2", "--caption", "link", "--color", "#000"],
-    ["tag", "--title", "urgent", "--fill-color", "red", "--text-color", "#fff"],
+    ["tag", "--title", "urgent", "--fill-color", "red"],
 ])
 def test_subcommands_dry_run(monkeypatch, capsys, argv):
     code, _ = run_main(monkeypatch, ["--board-id", "b", "--token", "t", *argv, "--dry-run"])
@@ -83,7 +83,7 @@ def test_batch_create(tmp_path, monkeypatch, capsys):
         {"type": "shape", "content": "d"},
         {"type": "frame", "title": "e"},
         {"type": "image", "url": "https://x", "width": 400},
-        {"type": "document", "title": "f", "url": "https://x", "preview_url": "https://y"},
+        {"type": "document", "title": "f", "url": "https://x"},
         {"type": "embed", "url": "https://x"},
         {"type": "connector", "start_item_id": "1", "end_item_id": "2", "caption": "link"},
         {"type": "tag", "title": "g"},

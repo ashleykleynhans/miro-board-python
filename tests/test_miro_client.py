@@ -40,29 +40,57 @@ def test_paginates_with_cursor(monkeypatch):
     assert session.calls[1]["params"]["cursor"] == "next"
 
 
-def test_create_item_builds_body(monkeypatch):
+def test_create_item_uses_per_type_endpoint(monkeypatch):
     client, session = client_for(monkeypatch)
     client.create_item("b", "sticky_note", data={"content": "hi"}, position={"x": 1, "y": 2})
     call = session.calls[0]
     assert call["method"] == "POST"
-    assert call["url"] == "/boards/b/items"
-    assert call["json"]["type"] == "sticky_note"
-    assert call["json"]["data"] == {"content": "hi"}
+    assert call["url"] == "/boards/b/sticky_notes"
+    assert call["json"] == {"data": {"content": "hi"}, "position": {"x": 1, "y": 2}}
 
 
 def test_create_item_with_parent(monkeypatch):
     client, session = client_for(monkeypatch)
     client.create_item("b", "frame", parent_id="f1")
-    assert session.calls[0]["json"]["parent"] == {"id": "f1"}
+    call = session.calls[0]
+    assert call["url"] == "/boards/b/frames"
+    assert call["json"] == {"parent": {"id": "f1"}}
+
+
+def test_create_item_unsupported_type(monkeypatch):
+    client, _ = client_for(monkeypatch)
+    with pytest.raises(MiroError):
+        client.create_item("b", "bogus")
 
 
 def test_update_item(monkeypatch):
     client, session = client_for(monkeypatch)
-    client.update_item("b", "1", data={"content": "x"}, style={"fillColor": "red"})
+    client.update_item(
+        "b", "1", item_type="sticky_note", data={"content": "x"}, style={"fillColor": "red"}
+    )
     call = session.calls[0]
     assert call["method"] == "PATCH"
-    assert call["url"] == "/boards/b/items/1"
+    assert call["url"] == "/boards/b/sticky_notes/1"
     assert call["json"] == {"data": {"content": "x"}, "style": {"fillColor": "red"}}
+
+
+def test_update_item_resolves_type(monkeypatch):
+    responses = [
+        FakeResponse(200, {"id": "1", "type": "shape"}),
+        FakeResponse(200, {"id": "1"}),
+    ]
+    client, session = client_for(monkeypatch, responses)
+    client.update_item("b", "1", data={"content": "x"})
+    assert session.calls[0]["url"] == "/boards/b/items/1"
+    assert session.calls[1]["url"] == "/boards/b/shapes/1"
+
+
+def test_update_item_unsupported_resolved_type(monkeypatch):
+    client, _ = client_for(
+        monkeypatch, [FakeResponse(200, {"id": "1", "type": "mindmap_node"})]
+    )
+    with pytest.raises(MiroError):
+        client.update_item("b", "1", data={"content": "x"})
 
 
 def test_delete_returns_none(monkeypatch):
@@ -90,11 +118,18 @@ def test_raises_miro_error_on_bad_status(monkeypatch):
     assert "HTTP 400" in str(exc.value)
 
 
+def test_405_mentions_per_type_endpoints(monkeypatch):
+    client, _ = client_for(monkeypatch, [FakeResponse(405, text="methodNotSupported")])
+    with pytest.raises(MiroError) as exc:
+        client.get_board("b")
+    assert "per-item-type" in str(exc.value)
+
+
 def test_create_sticky_note(monkeypatch):
     client, session = client_for(monkeypatch)
     client.create_sticky_note("b", "Hello", x=10, y=20, color="light_blue")
     body = session.calls[0]["json"]
-    assert body["type"] == "sticky_note"
+    assert session.calls[0]["url"] == "/boards/b/sticky_notes"
     assert body["data"] == {"content": "Hello"}
     assert body["style"] == {"fillColor": "light_blue"}
     assert body["position"] == {"x": 10, "y": 20, "origin": "center"}
@@ -104,10 +139,12 @@ def test_create_sticky_note(monkeypatch):
 def test_create_card_with_assignee(monkeypatch):
     client, session = client_for(monkeypatch)
     client.create_card("b", "T", description="D", assignee_id="9", x=1, y=2)
-    assert session.calls[0]["json"]["data"] == {
+    call = session.calls[0]
+    assert call["url"] == "/boards/b/cards"
+    assert call["json"]["data"] == {
         "title": "T",
         "description": "D",
-        "assignee": {"id": "9"},
+        "assigneeId": "9",
     }
 
 
@@ -117,7 +154,7 @@ def test_create_card_without_assignee(monkeypatch):
     assert session.calls[0]["json"]["data"] == {
         "title": "T",
         "description": "",
-        "assignee": None,
+        "assigneeId": None,
     }
 
 
@@ -125,17 +162,17 @@ def test_create_text(monkeypatch):
     client, session = client_for(monkeypatch)
     client.create_text("b", "Notes", x=5, y=6, width=300)
     body = session.calls[0]["json"]
-    assert body["type"] == "text"
+    assert session.calls[0]["url"] == "/boards/b/texts"
     assert body["data"] == {"content": "Notes"}
     assert body["geometry"] == {"width": 300}
 
 
 def test_create_shape(monkeypatch):
     client, session = client_for(monkeypatch)
-    client.create_shape("b", "Decision", shape_type="diamond", fill_color="#f00", border_color="#00f")
+    client.create_shape("b", "Decision", shape_type="rhombus", fill_color="#f00", border_color="#00f")
     body = session.calls[0]["json"]
-    assert body["type"] == "shape"
-    assert body["data"] == {"content": "Decision", "shapeType": "diamond"}
+    assert session.calls[0]["url"] == "/boards/b/shapes"
+    assert body["data"] == {"content": "Decision", "shape": "rhombus"}
     assert body["style"] == {"fillColor": "#f00", "borderColor": "#00f"}
 
 
@@ -143,7 +180,7 @@ def test_create_shape_defaults(monkeypatch):
     client, session = client_for(monkeypatch)
     client.create_shape("b")
     body = session.calls[0]["json"]
-    assert body["data"] == {"content": "", "shapeType": "rectangle"}
+    assert body["data"] == {"content": "", "shape": "rectangle"}
     assert body["style"] == {"fillColor": "#ffffff", "borderColor": "#1a1a1a"}
 
 
@@ -151,7 +188,7 @@ def test_create_frame(monkeypatch):
     client, session = client_for(monkeypatch)
     client.create_frame("b", title="Sec", x=1, y=2, width=1000, height=700)
     body = session.calls[0]["json"]
-    assert body["type"] == "frame"
+    assert session.calls[0]["url"] == "/boards/b/frames"
     assert body["data"] == {"title": "Sec"}
     assert body["geometry"] == {"width": 1000, "height": 700}
 
@@ -168,7 +205,10 @@ def test_add_to_frame(monkeypatch):
 def test_create_image_width_only(monkeypatch):
     client, session = client_for(monkeypatch)
     client.create_image("b", "https://x/p.png", width=400)
-    assert session.calls[0]["json"]["geometry"] == {"width": 400, "height": 400}
+    body = session.calls[0]["json"]
+    assert session.calls[0]["url"] == "/boards/b/images"
+    assert body["data"] == {"imageUrl": "https://x/p.png"}
+    assert body["geometry"] == {"width": 400, "height": 400}
 
 
 def test_create_image_height_only(monkeypatch):
@@ -185,25 +225,17 @@ def test_create_image_no_geometry(monkeypatch):
 
 def test_create_document(monkeypatch):
     client, session = client_for(monkeypatch)
-    client.create_document("b", "Spec", "https://x", preview_url="https://y")
-    assert session.calls[0]["json"]["data"] == {
-        "title": "Spec",
-        "url": "https://x",
-        "previewUrl": "https://y",
-    }
-
-
-def test_create_document_without_preview(monkeypatch):
-    client, session = client_for(monkeypatch)
     client.create_document("b", "Spec", "https://x")
-    assert session.calls[0]["json"]["data"] == {"title": "Spec", "url": "https://x"}
+    call = session.calls[0]
+    assert call["url"] == "/boards/b/documents"
+    assert call["json"]["data"] == {"title": "Spec", "documentUrl": "https://x"}
 
 
 def test_create_embed(monkeypatch):
     client, session = client_for(monkeypatch)
     client.create_embed("b", "https://x")
     body = session.calls[0]["json"]
-    assert body["type"] == "embed"
+    assert session.calls[0]["url"] == "/boards/b/embeds"
     assert body["data"] == {"url": "https://x", "mode": "inline"}
     assert body["geometry"] == {"width": 480, "height": 320}
 
@@ -232,65 +264,77 @@ def test_list_tags(monkeypatch):
 
 def test_create_tag(monkeypatch):
     client, session = client_for(monkeypatch)
-    client.create_tag("b", "urgent", fill_color="red", text_color="#ffffff")
+    client.create_tag("b", "urgent", fill_color="red")
     call = session.calls[0]
     assert call["url"] == "/boards/b/tags"
-    assert call["json"] == {"tag": {"title": "urgent", "fillColor": "red", "textColor": "#ffffff"}}
+    assert call["json"] == {"title": "urgent", "fillColor": "red"}
 
 
 def test_assign_tag(monkeypatch):
     client, session = client_for(monkeypatch)
     client.assign_tag("b", "1", "t1")
-    assert session.calls[0]["json"] == {"tagIds": ["t1"]}
+    call = session.calls[0]
+    assert call["method"] == "POST"
+    assert call["url"] == "/boards/b/items/1"
+    assert call["params"] == {"tag_id": "t1"}
 
 
 def test_move_item(monkeypatch):
     client, session = client_for(monkeypatch)
     client.move_item("b", "1", x=10, y=20)
-    assert session.calls[0]["json"] == {"position": {"x": 10, "y": 20, "origin": "center"}}
+    call = session.calls[0]
+    assert call["url"] == "/boards/b/items/1"
+    assert call["json"] == {"position": {"x": 10, "y": 20}}
 
 
 def test_set_sticky_note_text(monkeypatch):
     client, session = client_for(monkeypatch)
     client.set_sticky_note_text("b", "1", "new")
-    assert session.calls[0]["json"] == {"data": {"content": "new"}}
+    call = session.calls[0]
+    assert call["url"] == "/boards/b/sticky_notes/1"
+    assert call["json"] == {"data": {"content": "new"}}
 
 
 def test_resize_width_only(monkeypatch):
     client, session = client_for(monkeypatch)
-    client.resize_item("b", "1", width=100)
+    client.resize_item("b", "1", width=100, item_type="shape")
+    assert session.calls[0]["url"] == "/boards/b/shapes/1"
     assert session.calls[0]["json"] == {"geometry": {"width": 100}}
 
 
 def test_resize_height_only(monkeypatch):
     client, session = client_for(monkeypatch)
-    client.resize_item("b", "1", height=200)
+    client.resize_item("b", "1", height=200, item_type="shape")
     assert session.calls[0]["json"] == {"geometry": {"height": 200}}
 
 
 def test_resize_both(monkeypatch):
     client, session = client_for(monkeypatch)
-    client.resize_item("b", "1", width=100, height=200)
+    client.resize_item("b", "1", width=100, height=200, item_type="shape")
     assert session.calls[0]["json"] == {"geometry": {"width": 100, "height": 200}}
 
 
 def test_resize_none(monkeypatch):
     client, session = client_for(monkeypatch)
-    client.resize_item("b", "1")
+    client.resize_item("b", "1", item_type="shape")
     assert session.calls[0]["json"] == {}
 
 
 def test_set_item_color(monkeypatch):
     client, session = client_for(monkeypatch)
-    client.set_item_color("b", "1", "green")
-    assert session.calls[0]["json"] == {"style": {"fillColor": "green"}}
+    client.set_item_color("b", "1", "green", item_type="sticky_note")
+    call = session.calls[0]
+    assert call["url"] == "/boards/b/sticky_notes/1"
+    assert call["json"] == {"style": {"fillColor": "green"}}
 
 
 def test_update_shape_all_fields(monkeypatch):
     client, session = client_for(monkeypatch)
     client.update_shape("b", "1", content="x", shape_type="circle", fill_color="#fff", border_color="#000")
-    assert session.calls[0]["json"] == {
-        "data": {"content": "x", "shapeType": "circle"},
+    call = session.calls[0]
+    assert call["url"] == "/boards/b/shapes/1"
+    assert call["json"] == {
+        "data": {"content": "x", "shape": "circle"},
         "style": {"fillColor": "#fff", "borderColor": "#000"},
     }
 
