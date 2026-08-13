@@ -6,6 +6,16 @@ an access token.
 
 ## Setup
 
+Create and activate a virtual environment at `.venv`:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate        # macOS/Linux
+# Windows (PowerShell): .venv\Scripts\activate
+```
+
+Install the dependencies, then set up your environment file:
+
 ```bash
 pip install -r requirements.txt
 cp .env.example .env
@@ -92,6 +102,8 @@ Item ids come from `read_board.py --json items.json`.
 
 ## Testing
 
+With the venv active, install the dev dependencies and run the tests:
+
 ```bash
 pip install -r requirements-dev.txt
 pytest
@@ -99,6 +111,9 @@ pytest
 
 Coverage runs by default and must be 100%, otherwise the test run fails.
 Tests use a fake HTTP layer, so no Miro token or network is required.
+
+Tests also run automatically on every push to GitHub via a CI workflow; pushes
+that only touch irrelevant files (such as `*.md`) are skipped.
 
 ## Library
 
