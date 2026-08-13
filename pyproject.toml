@@ -1,0 +1,10 @@
+[tool.pytest.ini_options]
+addopts = "--cov=miro_client --cov=read_board --cov=write_board --cov=update_board --cov-report=term-missing --cov-fail-under=100"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.coverage.report]
+exclude_also = [
+    "if __name__ == .__main__.:",
+    "sys.exit\\(main\\(sys.argv",
+]
