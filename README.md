@@ -1,8 +1,8 @@
-# Miro Board POC
+# miro-board-python
 
-Proof of concept for reading, writing, and updating a Miro board through the
-[Miro REST API v2](https://developers.miro.com/reference/api-reference) using
-an access token.
+Python CLI and library for reading, writing, and updating a Miro board through
+the [Miro REST API v2](https://developers.miro.com/reference/api-reference)
+using an access token.
 
 ## Setup
 
