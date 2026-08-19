@@ -1,3 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "miro-board"
+version = "0.1.0"
+description = "Python CLI and library for reading, writing, and updating a Miro board via the REST API v2, plus an MCP server."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Ashley Kleynhans" }]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "requests==2.34.2",
+    "rich==15.0.0",
+    "mcp>=1.29.0,<2",
+    "python-dotenv>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/ashleykleynhans/miro-board-python"
+Repository = "https://github.com/ashleykleynhans/miro-board-python"
+
+[tool.setuptools]
+py-modules = ["miro_client", "read_board", "write_board", "update_board", "server"]
+
+[tool.setuptools.packages.find]
+include = ["miro_mcp*"]
+
 [tool.pytest.ini_options]
 addopts = "--cov=miro_client --cov=read_board --cov=write_board --cov=update_board --cov=miro_mcp --cov=server --cov-report=term-missing --cov-fail-under=100"
 testpaths = ["tests"]

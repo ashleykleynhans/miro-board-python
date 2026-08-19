@@ -1,4 +1,4 @@
 requests==2.34.2
 rich==15.0.0
-mcp>=1.28.0,<2
+mcp>=1.29.0,<2
 python-dotenv>=1.0.0
