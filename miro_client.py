@@ -248,20 +248,29 @@ class MiroClient:
         assignee_id: Optional[str] = None,
         x: float = 0.0,
         y: float = 0.0,
+        width: float = 320,
+        height: Optional[float] = None,
         parent_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Create a card with an optional title, description, and assignee."""
+        """Create a card with an optional title, description, and assignee.
+
+        Miro collapses a card to its own default height (not the caller's
+        intended layout height) unless `height` is given explicitly.
+        """
         data: Dict[str, Any] = {
             "title": title,
             "description": description,
             "assigneeId": assignee_id,
         }
+        geometry: Dict[str, Any] = {"width": width}
+        if height is not None:
+            geometry["height"] = height
         return self.create_item(
             board_id,
             "card",
             data=data,
             position={"x": x, "y": y, "origin": "center"},
-            geometry={"width": 320},
+            geometry=geometry,
             parent_id=parent_id,
         )
 

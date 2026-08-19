@@ -166,6 +166,21 @@ def test_create_card_with_parent_id(monkeypatch):
     assert call["json"]["parent"] == {"id": "frame-1"}
 
 
+def test_create_card_without_height_omits_geometry_height(monkeypatch):
+    """create_card leaves height unset by default, matching prior behaviour."""
+    client, session = client_for(monkeypatch)
+    client.create_card("b", "T")
+    assert session.calls[0]["json"]["geometry"] == {"width": 320}
+
+
+def test_create_card_with_height_overrides_miros_default_collapse(monkeypatch):
+    """create_card sends an explicit height so Miro doesn't collapse the card to its own
+    default (Miro otherwise renders cards ~60px tall regardless of caller-intended layout)."""
+    client, session = client_for(monkeypatch)
+    client.create_card("b", "T", width=320, height=220)
+    assert session.calls[0]["json"]["geometry"] == {"width": 320, "height": 220}
+
+
 def test_create_sticky_note_with_parent_id(monkeypatch):
     """create_sticky_note nests the new sticky note under the given parent_id."""
     client, session = client_for(monkeypatch)
