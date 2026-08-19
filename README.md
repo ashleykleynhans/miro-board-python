@@ -108,6 +108,39 @@ item's content, style, or size need an `item_type` (sticky_note, card, text,
 shape, frame, image, document, embed); when omitted the type is looked up
 automatically.
 
+## MCP server
+
+The same library powers an [MCP](https://modelcontextprotocol.io) server so MCP
+clients (e.g. Claude Code) can read and write Miro boards directly.
+
+```bash
+python server.py
+```
+
+Configure the client in your MCP client config. For Claude Code, add to
+`.claude/settings.json` (or your opencode config):
+
+```json
+{
+  "mcpServers": {
+    "miro": {
+      "command": "python",
+      "args": ["/path/to/miro-poc/server.py"],
+      "env": {
+        "MIRO_ACCESS_TOKEN": "your_token",
+        "MIRO_BOARD_ID": "uxXXXXXXXXXXXXX"
+      }
+    }
+  }
+}
+```
+
+The transport defaults to `stdio`; set `MIRO_MCP_TRANSPORT` to `sse` or
+`streamable-http` to change it. Board ids fall back to `MIRO_BOARD_ID` when not
+passed per call. The server exposes 24 tools: boards, items (create/update/
+move/resize/delete), sticky notes, cards, text, shapes, frames, images,
+documents, embeds, connectors, and tags.
+
 ## Testing
 
 With the venv active, install the dev dependencies and run the tests:
