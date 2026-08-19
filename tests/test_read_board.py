@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 
 import pytest
 
@@ -91,3 +92,10 @@ def test_api_error_returns_1(monkeypatch, capsys):
     )
     assert code == 1
     assert "HTTP 404" in capsys.readouterr().err
+
+
+def test_main_uses_sys_argv_when_argv_omitted(monkeypatch):
+    """main() falls back to sys.argv when called with no arguments, as a console-script entry point would."""
+    monkeypatch.setattr(sys, "argv", ["read_board", "--help"])
+    with pytest.raises(SystemExit):
+        read_board.main()

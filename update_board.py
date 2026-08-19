@@ -29,7 +29,7 @@ import argparse
 import json
 import os
 import sys
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from rich.console import Console
 from rich.markup import escape
@@ -85,7 +85,9 @@ def apply_op(
     console.print(f"[green]{operation}[/green] {escape(str(item_id))} -> ok")
 
 
-def main(argv: List[str]) -> int:
+def main(argv: Optional[List[str]] = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
     parser = argparse.ArgumentParser(description="Update or delete Miro board items.")
     parser.add_argument("--board-id", default=os.environ.get("MIRO_BOARD_ID"))
     parser.add_argument("--token", default=os.environ.get("MIRO_ACCESS_TOKEN"))
@@ -174,4 +176,4 @@ def main(argv: List[str]) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(main())

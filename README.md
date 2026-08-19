@@ -1,62 +1,71 @@
 # miro-board-python
 
+![PyPI](https://img.shields.io/pypi/v/miro-board)
+![Python Versions](https://img.shields.io/pypi/pyversions/miro-board)
+![License](https://img.shields.io/pypi/l/miro-board)
+![CI](https://github.com/ashleykleynhans/miro-board-python/actions/workflows/ci.yml/badge.svg?branch=main)
+
 Python CLI and library for reading, writing, and updating a Miro board through
 the [Miro REST API v2](https://developers.miro.com/reference/api-reference)
-using an access token.
+using an access token. Also ships an [MCP](https://modelcontextprotocol.io)
+server so MCP clients (e.g. Claude Code) can work with a board directly.
+
+## Installation
+
+```bash
+pip install miro-board
+```
+
+This installs the library (`miro_client`) and a `miro` command with four
+actions: `read`, `write`, `update`, and `mcp-server`.
 
 ## Setup
 
-Create and activate a virtual environment at `.venv`:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate        # macOS/Linux
-# Windows (PowerShell): .venv\Scripts\activate
-```
-
-Install the dependencies, then set up your environment file:
-
-```bash
-pip install -r requirements.txt
-cp .env.example .env
-# put your token and board id in .env, then:
-set -a && source .env && set +a
-```
-
-Get a token from the **Miro REST API** section of a board's share menu, or from
-a [Miro developer app](https://developers.miro.com). The token needs `boards:read`
-and `boards:write` scopes.
+Get a token from the **Miro REST API** section of a board's share menu, or
+from a [Miro developer app](https://developers.miro.com). The token needs
+`boards:read` and `boards:write` scopes.
 
 Note: the "Miro REST API" token from a board's Share menu is **read-only**. It
-works for `read_board.py`, but `write_board.py` and `update_board.py` will fail
-with HTTP 405. For write access, create a developer app and use an OAuth 2.0
-access token with the `boards:read` and `boards:write` scopes.
+works for `miro read`, but `miro write` and `miro update` will fail with HTTP
+405. For write access, create a developer app and use an OAuth 2.0 access
+token with the `boards:read` and `boards:write` scopes.
 
 Board id is the numeric part of the board URL, e.g. for
 `https://miro.com/app/board/uxXXXXXXXXXXXXX/` the id is `uxXXXXXXXXXXXXX`.
 
+Export the token and board id as environment variables so you don't have to
+pass them on every command:
+
+```bash
+export MIRO_ACCESS_TOKEN=your_token
+export MIRO_BOARD_ID=uxXXXXXXXXXXXXX
+```
+
+Both can also be passed explicitly with `--token` and `--board-id` on any
+command.
+
 ## Read
 
 ```bash
-python read_board.py --board-id uxXXXXXXXXXXXXX
-python read_board.py --board-id uxXXXXXXXXXXXXX --json items.json
-python read_board.py --board-id uxXXXXXXXXXXXXX --item-type card
+miro read --board-id uxXXXXXXXXXXXXX
+miro read --board-id uxXXXXXXXXXXXXX --json items.json
+miro read --board-id uxXXXXXXXXXXXXX --item-type card
 ```
 
 ## Write
 
 ```bash
-python write_board.py --board-id uxXXXXXXXXXXXXX sticky "Hello world" --x 100 --y 200
-python write_board.py --board-id uxXXXXXXXXXXXXX card --title "Task" --description "Do it"
-python write_board.py --board-id uxXXXXXXXXXXXXX text "Notes" --x 600
-python write_board.py --board-id uxXXXXXXXXXXXXX shape "Decision" --shape-type rhombus
-python write_board.py --board-id uxXXXXXXXXXXXXX frame --title "Section" --width 1000
-python write_board.py --board-id uxXXXXXXXXXXXXX image --url https://example.com/pic.png
-python write_board.py --board-id uxXXXXXXXXXXXXX document --title "Spec" --url https://example.com/doc
-python write_board.py --board-id uxXXXXXXXXXXXXX embed --url https://example.com
-python write_board.py --board-id uxXXXXXXXXXXXXX connector --start-item-id <id> --end-item-id <id> --caption "links to"
-python write_board.py --board-id uxXXXXXXXXXXXXX tag --title urgent --fill-color red
-python write_board.py --board-id uxXXXXXXXXXXXXX --file items.json --dry-run
+miro write --board-id uxXXXXXXXXXXXXX sticky "Hello world" --x 100 --y 200
+miro write --board-id uxXXXXXXXXXXXXX card --title "Task" --description "Do it"
+miro write --board-id uxXXXXXXXXXXXXX text "Notes" --x 600
+miro write --board-id uxXXXXXXXXXXXXX shape "Decision" --shape-type rhombus
+miro write --board-id uxXXXXXXXXXXXXX frame --title "Section" --width 1000
+miro write --board-id uxXXXXXXXXXXXXX image --url https://example.com/pic.png
+miro write --board-id uxXXXXXXXXXXXXX document --title "Spec" --url https://example.com/doc
+miro write --board-id uxXXXXXXXXXXXXX embed --url https://example.com
+miro write --board-id uxXXXXXXXXXXXXX connector --start-item-id <id> --end-item-id <id> --caption "links to"
+miro write --board-id uxXXXXXXXXXXXXX tag --title urgent --fill-color red
+miro write --board-id uxXXXXXXXXXXXXX --file items.json --dry-run
 ```
 
 Batch file (`items.json`):
@@ -79,13 +88,13 @@ Supported types in batch files: `sticky_note`, `card`, `text`, `shape`, `frame`,
 ## Update / delete
 
 ```bash
-python update_board.py --board-id uxXXXXXXXXXXXXX set-text <item-id> "New text"
-python update_board.py --board-id uxXXXXXXXXXXXXX set-color <item-id> --color light_blue
-python update_board.py --board-id uxXXXXXXXXXXXXX resize <item-id> --width 300 --height 200
-python update_board.py --board-id uxXXXXXXXXXXXXX move <item-id> --x 500 --y 300
-python update_board.py --board-id uxXXXXXXXXXXXXX tag <item-id> <tag-id>
-python update_board.py --board-id uxXXXXXXXXXXXXX delete <item-id>
-python update_board.py --board-id uxXXXXXXXXXXXXX update --file changes.json --dry-run
+miro update --board-id uxXXXXXXXXXXXXX set-text <item-id> "New text"
+miro update --board-id uxXXXXXXXXXXXXX set-color <item-id> --color light_blue
+miro update --board-id uxXXXXXXXXXXXXX resize <item-id> --width 300 --height 200
+miro update --board-id uxXXXXXXXXXXXXX move <item-id> --x 500 --y 300
+miro update --board-id uxXXXXXXXXXXXXX tag <item-id> <tag-id>
+miro update --board-id uxXXXXXXXXXXXXX delete <item-id>
+miro update --board-id uxXXXXXXXXXXXXX update --file changes.json --dry-run
 ```
 
 Batch file (`changes.json`):
@@ -103,18 +112,18 @@ Batch file (`changes.json`):
 ]
 ```
 
-Item ids come from `read_board.py --json items.json`. Updates that change an
-item's content, style, or size need an `item_type` (sticky_note, card, text,
-shape, frame, image, document, embed); when omitted the type is looked up
-automatically.
+Item ids come from `miro read --board-id uxXXXXXXXXXXXXX --json items.json`.
+Updates that change an item's content, style, or size need an `item_type`
+(sticky_note, card, text, shape, frame, image, document, embed); when omitted
+the type is looked up automatically.
 
 ## MCP server
 
-The same library powers an [MCP](https://modelcontextprotocol.io) server so MCP
-clients (e.g. Claude Code) can read and write Miro boards directly.
+The same library powers an MCP server so MCP clients (e.g. Claude Code) can
+read and write Miro boards directly.
 
 ```bash
-python server.py
+miro mcp-server
 ```
 
 Configure the client in your MCP client config. For Claude Code, add to
@@ -124,8 +133,8 @@ Configure the client in your MCP client config. For Claude Code, add to
 {
   "mcpServers": {
     "miro": {
-      "command": "python",
-      "args": ["/path/to/miro-poc/server.py"],
+      "command": "miro",
+      "args": ["mcp-server"],
       "env": {
         "MIRO_ACCESS_TOKEN": "your_token",
         "MIRO_BOARD_ID": "uxXXXXXXXXXXXXX"
@@ -141,6 +150,46 @@ passed per call. The server exposes 24 tools: boards, items (create/update/
 move/resize/delete), sticky notes, cards, text, shapes, frames, images,
 documents, embeds, connectors, and tags.
 
+## Library
+
+`miro_client` also works as a library:
+
+```python
+from miro_client import MiroClient
+
+client = MiroClient.from_env()
+board = client.get_board("uxXXXXXXXXXXXXX")
+sticky = client.create_sticky_note(board["id"], "Hello", x=0, y=0)
+client.set_sticky_note_text(board["id"], sticky["id"], "Updated")
+```
+
+Supported item helpers: sticky notes, cards, text, shapes, frames, images,
+documents, embeds, connectors, and tags. Arbitrary item types can be created
+through `client.create_item(...)`.
+
+## Development
+
+To work on the package itself, clone the repository and set up a virtual
+environment from source:
+
+```bash
+git clone https://github.com/ashleykleynhans/miro-board-python.git
+cd miro-board-python
+python3 -m venv .venv
+source .venv/bin/activate        # macOS/Linux
+# Windows (PowerShell): .venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env
+# put your token and board id in .env, then:
+set -a && source .env && set +a
+```
+
+From a local clone, the individual scripts also still work directly, without
+going through the `miro` command, e.g. `python read_board.py --board-id ...`,
+`python write_board.py --board-id ... sticky "..."`,
+`python update_board.py --board-id ... set-text ...`, and `python server.py`
+for the MCP server.
+
 ## Testing
 
 With the venv active, install the dev dependencies and run the tests:
@@ -155,20 +204,3 @@ Tests use a fake HTTP layer, so no Miro token or network is required.
 
 Tests also run automatically on every push to GitHub via a CI workflow; pushes
 that only touch irrelevant files (such as `*.md`) are skipped.
-
-## Library
-
-`miro_client.py` also works as a library:
-
-```python
-from miro_client import MiroClient
-
-client = MiroClient.from_env()
-board = client.get_board("uxXXXXXXXXXXXXX")
-sticky = client.create_sticky_note(board["id"], "Hello", x=0, y=0)
-client.set_sticky_note_text(board["id"], sticky["id"], "Updated")
-```
-
-Supported item helpers: sticky notes, cards, text, shapes, frames, images,
-documents, embeds, connectors, and tags. Arbitrary item types can be created
-through `client.create_item(...)`.

@@ -36,7 +36,7 @@ import argparse
 import json
 import os
 import sys
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from rich.console import Console
 from rich.markup import escape
@@ -126,7 +126,9 @@ def create_from_dict(client: MiroClient, board_id: str, spec: Dict[str, Any]) ->
     raise MiroError(f"unsupported item type in file: {item_type!r}")
 
 
-def main(argv: List[str]) -> int:
+def main(argv: Optional[List[str]] = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
     parser = argparse.ArgumentParser(description="Create items on a Miro board.")
     parser.add_argument("--board-id", default=os.environ.get("MIRO_BOARD_ID"))
     parser.add_argument("--token", default=os.environ.get("MIRO_ACCESS_TOKEN"))
@@ -271,4 +273,4 @@ def spec_from_args(args: argparse.Namespace) -> Dict[str, Any]:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(main())

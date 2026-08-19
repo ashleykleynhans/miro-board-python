@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 
 import pytest
 
@@ -148,3 +149,10 @@ def test_create_error_returns_1(monkeypatch, capsys):
 def test_spec_from_args_unsupported():
     with pytest.raises(MiroError):
         write_board.spec_from_args(argparse.Namespace(command="bogus"))
+
+
+def test_main_uses_sys_argv_when_argv_omitted(monkeypatch):
+    """main() falls back to sys.argv when called with no arguments, as a console-script entry point would."""
+    monkeypatch.setattr(sys, "argv", ["write_board", "--help"])
+    with pytest.raises(SystemExit):
+        write_board.main()
