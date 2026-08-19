@@ -78,6 +78,80 @@ def test_delete(monkeypatch):
     assert session.calls[0]["method"] == "DELETE"
 
 
+def test_clear_board_deletes_non_frames_before_frames(monkeypatch, capsys):
+    """clear-board deletes every item, frames last so none is deleted while still parenting items."""
+    items = [
+        {"id": "frame-1", "type": "frame"},
+        {"id": "card-1", "type": "card"},
+        {"id": "sticky-1", "type": "sticky_note"},
+    ]
+    code, session = run_main(
+        monkeypatch,
+        ["--board-id", "b", "--token", "t", "clear-board", "--yes"],
+        [FakeResponse(200, {"data": items}), FakeResponse(204), FakeResponse(204), FakeResponse(204)],
+    )
+    assert code == 0
+    delete_calls = [c for c in session.calls if c["method"] == "DELETE"]
+    assert [c["url"] for c in delete_calls] == [
+        "/boards/b/items/card-1",
+        "/boards/b/items/sticky-1",
+        "/boards/b/items/frame-1",
+    ]
+    assert "Done." in capsys.readouterr().out
+
+
+def test_clear_board_empty_board_deletes_nothing(monkeypatch, capsys):
+    """clear-board on an already-empty board makes no delete calls."""
+    code, session = run_main(
+        monkeypatch,
+        ["--board-id", "b", "--token", "t", "clear-board", "--yes"],
+        [FakeResponse(200, {"data": []})],
+    )
+    assert code == 0
+    assert session.calls == [session.calls[0]]  # only the list_items call
+    assert "already empty" in capsys.readouterr().out
+
+
+def test_clear_board_dry_run_deletes_nothing(monkeypatch, capsys):
+    """clear-board --dry-run lists items without deleting or prompting."""
+    items = [{"id": "card-1", "type": "card"}]
+    code, session = run_main(
+        monkeypatch,
+        ["--board-id", "b", "--token", "t", "clear-board", "--dry-run"],
+        [FakeResponse(200, {"data": items})],
+    )
+    assert code == 0
+    assert len(session.calls) == 1  # only the list_items call, no deletes
+    assert "would delete card card-1" in capsys.readouterr().out
+
+
+def test_clear_board_prompts_without_yes(monkeypatch, capsys):
+    """clear-board without --yes asks for typed confirmation before deleting."""
+    items = [{"id": "card-1", "type": "card"}]
+    monkeypatch.setattr("builtins.input", lambda _: "clear")
+    code, session = run_main(
+        monkeypatch,
+        ["--board-id", "b", "--token", "t", "clear-board"],
+        [FakeResponse(200, {"data": items}), FakeResponse(204)],
+    )
+    assert code == 0
+    assert len([c for c in session.calls if c["method"] == "DELETE"]) == 1
+
+
+def test_clear_board_aborts_on_wrong_confirmation(monkeypatch, capsys):
+    """clear-board aborts and deletes nothing if the typed confirmation doesn't match."""
+    items = [{"id": "card-1", "type": "card"}]
+    monkeypatch.setattr("builtins.input", lambda _: "nope")
+    code, session = run_main(
+        monkeypatch,
+        ["--board-id", "b", "--token", "t", "clear-board"],
+        [FakeResponse(200, {"data": items})],
+    )
+    assert code == 1
+    assert not any(c["method"] == "DELETE" for c in session.calls)
+    assert "Aborted" in capsys.readouterr().err
+
+
 def test_batch_update(tmp_path, monkeypatch, capsys):
     batch = tmp_path / "changes.json"
     batch.write_text(json.dumps([

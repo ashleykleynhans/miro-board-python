@@ -94,8 +94,15 @@ miro update --board-id uxXXXXXXXXXXXXX resize <item-id> --width 300 --height 200
 miro update --board-id uxXXXXXXXXXXXXX move <item-id> --x 500 --y 300
 miro update --board-id uxXXXXXXXXXXXXX tag <item-id> <tag-id>
 miro update --board-id uxXXXXXXXXXXXXX delete <item-id>
+miro update --board-id uxXXXXXXXXXXXXX clear-board
 miro update --board-id uxXXXXXXXXXXXXX update --file changes.json --dry-run
 ```
+
+`clear-board` deletes every item on the board (frames last, so none is
+deleted while items are still parented to it) and prompts for typed
+confirmation unless `--yes` is given. Use `--dry-run` to list what would be
+deleted without deleting anything. Tags aren't deleted -- the Miro API has
+no tag-delete endpoint.
 
 Batch file (`changes.json`):
 

@@ -7,6 +7,9 @@ Usage:
     python update_board.py --board-id <id> move <item-id> --x 500 --y 300
     python update_board.py --board-id <id> tag <item-id> <tag-id>
     python update_board.py --board-id <id> delete <item-id>
+    python update_board.py --board-id <id> clear-board
+    python update_board.py --board-id <id> clear-board --yes
+    python update_board.py --board-id <id> clear-board --dry-run
     python update_board.py --board-id <id> update --file changes.json
     python update_board.py --board-id <id> update --file changes.json --dry-run
 
@@ -126,6 +129,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     delete = sub.add_parser("delete", help="delete an item")
     delete.add_argument("item_id")
 
+    clear_board = sub.add_parser("clear-board", help="delete every item on the board")
+    clear_board.add_argument("--yes", action="store_true", help="skip the confirmation prompt")
+    clear_board.add_argument("--dry-run", action="store_true", help="list what would be deleted without deleting")
+
     update = sub.add_parser("update", help="apply operations from a JSON file")
     update.add_argument("--file", required=True)
     update.add_argument("--dry-run", action="store_true")
@@ -136,7 +143,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if not args.board_id:
         parser.error("missing board id (use --board-id or MIRO_BOARD_ID)")
     if not args.command:
-        parser.error("missing subcommand (set-text, set-color, resize, move, tag, delete, or update)")
+        parser.error("missing subcommand (set-text, set-color, resize, move, tag, delete, clear-board, or update)")
 
     client = MiroClient(args.token)
     console = Console()
@@ -160,6 +167,28 @@ def main(argv: Optional[List[str]] = None) -> int:
         elif args.command == "delete":
             client.delete_item(args.board_id, args.item_id)
             console.print(f"[green]delete[/green] {escape(str(args.item_id))} -> ok")
+        elif args.command == "clear-board":
+            items = client.list_items(args.board_id)
+            if not items:
+                console.print("Board is already empty.")
+            else:
+                if not args.dry_run and not args.yes:
+                    error_console.print(
+                        f"[yellow]This will permanently delete {len(items)} item(s) "
+                        f"from board {escape(str(args.board_id))}.[/yellow]"
+                    )
+                    if input("Type 'clear' to confirm: ") != "clear":
+                        error_console.print("[red]Aborted.[/red]")
+                        return 1
+                # Frames last: an item still parented to a frame that's already
+                # gone is a stranger error than deleting the frame once it's empty.
+                ordered = [i for i in items if i["type"] != "frame"] + [i for i in items if i["type"] == "frame"]
+                for item in ordered:
+                    if args.dry_run:
+                        console.print(f"dry-run: would delete {escape(item['type'])} {escape(item['id'])}")
+                    else:
+                        client.delete_item(args.board_id, item["id"])
+                        console.print(f"[green]delete[/green] {escape(item['type'])} {escape(item['id'])} -> ok")
         else:
             with open(args.file) as handle:
                 ops = json.load(handle)
