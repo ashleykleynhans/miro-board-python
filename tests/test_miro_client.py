@@ -158,6 +158,22 @@ def test_create_card_without_assignee(monkeypatch):
     }
 
 
+def test_create_card_with_parent_id(monkeypatch):
+    """create_card nests the new card under the given parent_id."""
+    client, session = client_for(monkeypatch)
+    client.create_card("b", "Title", parent_id="frame-1")
+    call = session.calls[0]
+    assert call["json"]["parent"] == {"id": "frame-1"}
+
+
+def test_create_sticky_note_with_parent_id(monkeypatch):
+    """create_sticky_note nests the new sticky note under the given parent_id."""
+    client, session = client_for(monkeypatch)
+    client.create_sticky_note("b", "Content", parent_id="frame-1")
+    call = session.calls[0]
+    assert call["json"]["parent"] == {"id": "frame-1"}
+
+
 def test_create_text(monkeypatch):
     client, session = client_for(monkeypatch)
     client.create_text("b", "Notes", x=5, y=6, width=300)
@@ -191,6 +207,23 @@ def test_create_frame(monkeypatch):
     assert session.calls[0]["url"] == "/boards/b/frames"
     assert body["data"] == {"title": "Sec"}
     assert body["geometry"] == {"width": 1000, "height": 700}
+
+
+def test_create_frame_with_fill_color(monkeypatch):
+    """create_frame sends the given fill_color as the item's style."""
+    client, session = client_for(monkeypatch)
+    client.create_frame("b", "Section", fill_color="#1a73e8")
+    call = session.calls[0]
+    assert call["url"] == "/boards/b/frames"
+    assert call["json"]["style"] == {"fillColor": "#1a73e8"}
+
+
+def test_create_frame_without_fill_color_omits_style(monkeypatch):
+    """create_frame omits the style field entirely when no fill_color is given."""
+    client, session = client_for(monkeypatch)
+    client.create_frame("b", "Section")
+    call = session.calls[0]
+    assert "style" not in call["json"]
 
 
 def test_add_to_frame(monkeypatch):

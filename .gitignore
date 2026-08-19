@@ -6,6 +6,9 @@ __pycache__/
 venv/
 env/
 
+# Worktrees
+.worktrees/
+
 # Secrets
 .env
 .env.local

@@ -226,6 +226,7 @@ class MiroClient:
         x: float = 0.0,
         y: float = 0.0,
         color: str = "light_yellow",
+        parent_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create a sticky note at the given coordinates."""
         return self.create_item(
@@ -235,6 +236,7 @@ class MiroClient:
             style={"fillColor": color},
             position={"x": x, "y": y, "origin": "center"},
             geometry={"width": 180},
+            parent_id=parent_id,
         )
 
     def create_card(
@@ -246,6 +248,7 @@ class MiroClient:
         assignee_id: Optional[str] = None,
         x: float = 0.0,
         y: float = 0.0,
+        parent_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create a card with an optional title, description, and assignee."""
         data: Dict[str, Any] = {
@@ -259,6 +262,7 @@ class MiroClient:
             data=data,
             position={"x": x, "y": y, "origin": "center"},
             geometry={"width": 320},
+            parent_id=parent_id,
         )
 
     def create_text(
@@ -309,12 +313,14 @@ class MiroClient:
         y: float = 0.0,
         width: float = 800,
         height: float = 600,
+        fill_color: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Create a frame to group items visually."""
+        """Create a frame to group items visually, optionally with a fill color."""
         return self.create_item(
             board_id,
             "frame",
             data={"title": title},
+            style={"fillColor": fill_color} if fill_color else None,
             position={"x": x, "y": y, "origin": "center"},
             geometry={"width": width, "height": height},
         )
