@@ -63,6 +63,47 @@ def test_create_item_unsupported_type(monkeypatch):
         client.create_item("b", "bogus")
 
 
+def test_create_items_bulk(monkeypatch):
+    client, session = client_for(
+        monkeypatch,
+        [FakeResponse(201, {"type": "bulk-list", "data": [{"id": "1", "type": "sticky_note"}]})],
+    )
+    items = client.create_items("b", [{"type": "sticky_note", "data": {"content": "hi"}}])
+    assert items == [{"id": "1", "type": "sticky_note"}]
+    call = session.calls[0]
+    assert call["method"] == "POST"
+    assert call["url"] == "/boards/b/items/bulk"
+    assert call["json"] == [{"type": "sticky_note", "data": {"content": "hi"}}]
+
+
+def test_create_items_chunks_into_batches_of_20(monkeypatch):
+    many = [{"type": "text", "data": {"content": str(i)}} for i in range(45)]
+    responses = [
+        FakeResponse(201, {"type": "bulk-list", "data": [{"id": "a"}]}),
+        FakeResponse(201, {"type": "bulk-list", "data": [{"id": "b"}]}),
+        FakeResponse(201, {"type": "bulk-list", "data": [{"id": "c"}]}),
+    ]
+    client, session = client_for(monkeypatch, responses)
+    result = client.create_items("b", many)
+    assert result == [{"id": "a"}, {"id": "b"}, {"id": "c"}]
+    assert len(session.calls) == 3
+    assert len(session.calls[0]["json"]) == 20
+    assert len(session.calls[1]["json"]) == 20
+    assert len(session.calls[2]["json"]) == 5
+
+
+def test_create_items_requires_at_least_one_item(monkeypatch):
+    client, _ = client_for(monkeypatch)
+    with pytest.raises(MiroError, match="at least one item"):
+        client.create_items("b", [])
+
+
+def test_create_items_requires_type(monkeypatch):
+    client, _ = client_for(monkeypatch)
+    with pytest.raises(MiroError, match="missing a 'type'"):
+        client.create_items("b", [{"data": {"content": "hi"}}])
+
+
 def test_update_item(monkeypatch):
     client, session = client_for(monkeypatch)
     client.update_item(

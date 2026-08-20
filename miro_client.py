@@ -58,6 +58,9 @@ ITEM_ENDPOINTS = {
     "app_card": "app_cards",
 }
 
+# The bulk create endpoint accepts at most this many items per request.
+BULK_MAX_ITEMS = 20
+
 
 class MiroError(Exception):
     """Raised when the Miro API returns an error response."""
@@ -83,7 +86,7 @@ class MiroClient:
         path: str,
         *,
         params: Optional[Dict[str, Any]] = None,
-        json: Optional[Dict[str, Any]] = None,
+        json: Optional[Any] = None,
         retries: int = 3,
     ) -> Any:
         """Send a request to the Miro API and return the decoded JSON body."""
@@ -179,6 +182,33 @@ class MiroClient:
             if value is not None:
                 body[key] = value
         return self._request("POST", self._item_path(board_id, item_type), json=body)
+
+    def create_items(
+        self,
+        board_id: str,
+        items: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """Create multiple items in one call via the transactional bulk endpoint.
+
+        POST /boards/{board_id}/items/bulk accepts 1 to BULK_MAX_ITEMS items
+        per request and is transactional: if any item in a batch fails, none of
+        that batch is created. Longer lists are split into batches of
+        BULK_MAX_ITEMS, so partial success is possible across batches.
+
+        Each item follows the ItemCreate shape: a required "type" plus optional
+        "data", "style", "position", "geometry", and "parent" keys.
+        """
+        if not items:
+            raise MiroError("create_items requires at least one item")
+        for i, item in enumerate(items):
+            if not isinstance(item, dict) or "type" not in item:
+                raise MiroError(f"create_items item {i} is missing a 'type' field")
+        created: List[Dict[str, Any]] = []
+        for start in range(0, len(items), BULK_MAX_ITEMS):
+            chunk = items[start : start + BULK_MAX_ITEMS]
+            payload = self._request("POST", f"/boards/{board_id}/items/bulk", json=chunk)
+            created.extend(payload.get("data", []))
+        return created
 
     def update_item(
         self,

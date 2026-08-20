@@ -41,12 +41,19 @@ from typing import Any, Dict, List, Optional
 from rich.console import Console
 from rich.markup import escape
 
-from miro_client import MiroClient, MiroError, SHAPE_TYPES
+from miro_client import BULK_MAX_ITEMS, MiroClient, MiroError, SHAPE_TYPES
 
 STICKY_COLORS = {
     "red", "orange", "yellow", "green", "cyan", "light_green", "blue",
     "dark_blue", "magenta", "violet", "light_yellow", "light_pink", "gray",
     "light_blue", "dark_gray",
+}
+
+# Item types the bulk endpoint accepts. Connectors and tags are created
+# through their own endpoints and fall back to individual calls.
+BULK_TYPES = {
+    "sticky_note", "card", "text", "shape", "frame", "image", "document",
+    "embed",
 }
 
 
@@ -124,6 +131,75 @@ def create_from_dict(client: MiroClient, board_id: str, spec: Dict[str, Any]) ->
             fill_color=spec.get("fill_color", "red"),
         )
     raise MiroError(f"unsupported item type in file: {item_type!r}")
+
+
+def spec_to_bulk_item(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert a spec dict to the ItemCreate shape used by the bulk endpoint.
+
+    Mirrors the defaults applied by create_from_dict so a file produces the
+    same items whether created individually or in bulk.
+    """
+    item_type = spec["type"]
+    item: Dict[str, Any] = {
+        "type": item_type,
+        "position": {"x": spec.get("x", 0.0), "y": spec.get("y", 0.0), "origin": "center"},
+    }
+    if item_type == "sticky_note":
+        item["data"] = {"content": spec["content"]}
+        item["style"] = {"fillColor": spec.get("color", "light_yellow")}
+        item["geometry"] = {"width": spec.get("width", 180)}
+    elif item_type == "card":
+        data: Dict[str, Any] = {
+            "title": spec["title"],
+            "description": spec.get("description", ""),
+        }
+        if spec.get("assignee_id"):
+            data["assigneeId"] = spec["assignee_id"]
+        item["data"] = data
+        geometry: Dict[str, Any] = {"width": spec.get("width", 320)}
+        if spec.get("height") is not None:
+            geometry["height"] = spec["height"]
+        item["geometry"] = geometry
+    elif item_type == "text":
+        item["data"] = {"content": spec["content"]}
+        item["geometry"] = {"width": spec.get("width", 240)}
+    elif item_type == "shape":
+        item["data"] = {
+            "content": spec.get("content", ""),
+            "shape": spec.get("shape_type", "rectangle"),
+        }
+        item["style"] = {
+            "fillColor": spec.get("fill_color", "#ffffff"),
+            "borderColor": spec.get("border_color", "#1a1a1a"),
+        }
+        item["geometry"] = {
+            "width": spec.get("width", 160),
+            "height": spec.get("height", 80),
+        }
+    elif item_type == "frame":
+        item["data"] = {"title": spec.get("title", "")}
+        item["geometry"] = {"width": spec.get("width", 800), "height": spec.get("height", 600)}
+        if spec.get("fill_color"):
+            item["style"] = {"fillColor": spec["fill_color"]}
+    elif item_type == "image":
+        item["data"] = {"imageUrl": spec["url"]}
+        width = spec.get("width")
+        height = spec.get("height")
+        if width or height:
+            item["geometry"] = {
+                "width": width if width else height,
+                "height": height if height else width,
+            }
+    elif item_type == "document":
+        item["data"] = {"title": spec["title"], "documentUrl": spec["url"]}
+    elif item_type == "embed":
+        item["data"] = {"url": spec["url"], "mode": spec.get("mode", "inline")}
+        item["geometry"] = {"width": spec.get("width", 480), "height": spec.get("height", 320)}
+    else:
+        raise MiroError(f"unsupported item type in file: {item_type!r}")
+    if spec.get("parent_id"):
+        item["parent"] = {"id": spec["parent_id"]}
+    return item
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -224,7 +300,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     console = Console()
     error_console = Console(stderr=True)
     created: List[Dict[str, Any]] = []
-    for i, spec in enumerate(specs):
+    bulk_specs: List[Dict[str, Any]] = []
+    other_specs: List[Dict[str, Any]] = specs
+    if args.file and not args.dry_run:
+        bulk_specs = [s for s in specs if s["type"] in BULK_TYPES]
+        other_specs = [s for s in specs if s["type"] not in BULK_TYPES]
+
+    for i, spec in enumerate(other_specs):
         try:
             if args.dry_run:
                 console.print(f"dry-run: would create {escape(spec['type'])}")
@@ -239,6 +321,25 @@ def main(argv: Optional[List[str]] = None) -> int:
         except MiroError as exc:
             error_console.print(
                 f"[red]error on item {i} ({escape(str(spec.get('type', '?')))}):[/red] "
+                f"{escape(str(exc))}"
+            )
+            return 1
+
+    for start in range(0, len(bulk_specs), BULK_MAX_ITEMS):
+        chunk = bulk_specs[start : start + BULK_MAX_ITEMS]
+        try:
+            items = client.create_items(
+                args.board_id, [spec_to_bulk_item(spec) for spec in chunk]
+            )
+            for item in items:
+                created.append(item)
+                console.print(
+                    f"[green]created[/green] {escape(str(item.get('type')))} "
+                    f"{escape(str(item['id']))}"
+                )
+        except MiroError as exc:
+            error_console.print(
+                f"[red]error on items {start}-{start + len(chunk) - 1}:[/red] "
                 f"{escape(str(exc))}"
             )
             return 1

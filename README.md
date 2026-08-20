@@ -85,6 +85,12 @@ Batch file (`items.json`):
 Supported types in batch files: `sticky_note`, `card`, `text`, `shape`, `frame`,
 `image`, `document`, `embed`, `connector`, `tag`.
 
+Batch files are created through the Miro bulk endpoint
+(`POST /boards/{board_id}/items/bulk`), which is transactional and creates up to
+20 items per request; larger files are split across multiple bulk requests.
+Connectors and tags can't be bulk-created, so they're created individually after
+the bulk items.
+
 ## Update / delete
 
 ```bash
@@ -172,7 +178,17 @@ client.set_sticky_note_text(board["id"], sticky["id"], "Updated")
 
 Supported item helpers: sticky notes, cards, text, shapes, frames, images,
 documents, embeds, connectors, and tags. Arbitrary item types can be created
-through `client.create_item(...)`.
+through `client.create_item(...)`. To create many items in one request, pass the
+`ItemCreate` payloads (a `type` plus optional `data`, `style`, `position`,
+`geometry`, `parent`) to `client.create_items(...)`, which splits them into
+batches of 20:
+
+```python
+client.create_items(board["id"], [
+    {"type": "sticky_note", "data": {"content": "Idea"}, "position": {"x": 0, "y": 0}},
+    {"type": "card", "data": {"title": "Task"}, "position": {"x": 300, "y": 0}},
+])
+```
 
 ## Development
 
