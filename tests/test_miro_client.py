@@ -178,7 +178,7 @@ def test_create_sticky_note(monkeypatch):
 
 
 def test_create_sticky_note_with_explicit_width(monkeypatch):
-    """create_sticky_note sends only width -- Miro rejects a sticky note request that also
+    """create_sticky_note sends only width. Miro rejects a sticky note request that also
     specifies height, since sticky notes have a fixed aspect ratio."""
     client, session = client_for(monkeypatch)
     client.create_sticky_note("b", "Hello", width=200)

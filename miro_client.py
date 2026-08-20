@@ -366,8 +366,8 @@ class MiroClient:
 
         Unlike a sticky note, a shape's width and height are independent
         (no fixed aspect ratio) and its text doesn't get auto-enlarged to
-        fill the box -- useful for a text-heavy box where a sticky note's
-        aggressive auto-fit font sizing causes long lines to wrap.
+        fill the box. This is useful for a text-heavy box, where a sticky
+        note's aggressive auto-fit font sizing causes long lines to wrap.
         """
         return self.create_item(
             board_id,
