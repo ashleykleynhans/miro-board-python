@@ -124,6 +124,25 @@ class MiroClient:
             if not cursor:
                 break
 
+    def _paginate_offset(self, path: str, params: Optional[Dict[str, Any]] = None) -> Iterator[Dict[str, Any]]:
+        """Yield every item across all pages of an offset-paginated endpoint (e.g. tags),
+        which, unlike items/boards, never returns a "cursor" field, only
+        total/offset/size. Following _paginate's cursor here would silently stop after
+        the first page (that endpoint's default limit) on any board with more results."""
+        offset = 0
+        while True:
+            page_params = dict(params or {})
+            page_params["offset"] = offset
+            payload = self._request("GET", path, params=page_params)
+            data = payload.get("data", [])
+            if not data:
+                break
+            for item in data:
+                yield item
+            offset += len(data)
+            if offset >= payload.get("total", offset):
+                break
+
     def _item_path(self, board_id: str, item_type: str) -> str:
         """Return the per-type item collection path for an item type."""
         endpoint = ITEM_ENDPOINTS.get(item_type)
@@ -475,8 +494,9 @@ class MiroClient:
 
     # --------------------------------------------------------------- tags
     def list_tags(self, board_id: str) -> List[Dict[str, Any]]:
-        """Return all tags on a board."""
-        return list(self._paginate(f"/boards/{board_id}/tags"))
+        """Return all tags on a board (paginated internally by offset, since the
+        tags endpoint has no cursor)."""
+        return list(self._paginate_offset(f"/boards/{board_id}/tags"))
 
     def create_tag(
         self,

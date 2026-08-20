@@ -370,6 +370,31 @@ def test_list_tags(monkeypatch):
     assert client.list_tags("b") == [{"id": "t1"}]
 
 
+def test_list_tags_paginates_by_offset_not_cursor(monkeypatch):
+    """The tags endpoint paginates via offset/limit/total, and never returns a "cursor"
+    field (unlike items/boards). list_tags must follow offset, not cursor, or a board
+    with more tags than one page silently loses every tag past the first page."""
+    responses = [
+        FakeResponse(200, {"data": [{"id": "t1"}, {"id": "t2"}], "total": 3, "size": 2, "offset": 0, "limit": 2}),
+        FakeResponse(200, {"data": [{"id": "t3"}], "total": 3, "size": 1, "offset": 2, "limit": 2}),
+    ]
+    client, session = client_for(monkeypatch, responses)
+    assert client.list_tags("b") == [{"id": "t1"}, {"id": "t2"}, {"id": "t3"}]
+    assert session.calls[1]["params"]["offset"] == 2
+
+
+def test_list_tags_stops_on_empty_page(monkeypatch):
+    """list_tags stops when an offset page comes back empty, rather than looping forever
+    on an endpoint that reports a total larger than the items it can return."""
+    responses = [
+        FakeResponse(200, {"data": [{"id": "t1"}], "total": 2, "size": 1, "offset": 0, "limit": 2}),
+        FakeResponse(200, {"data": [], "total": 2, "size": 0, "offset": 1, "limit": 2}),
+    ]
+    client, session = client_for(monkeypatch, responses)
+    assert client.list_tags("b") == [{"id": "t1"}]
+    assert len(session.calls) == 2
+
+
 def test_create_tag(monkeypatch):
     client, session = client_for(monkeypatch)
     client.create_tag("b", "urgent", fill_color="red")
