@@ -226,16 +226,23 @@ class MiroClient:
         x: float = 0.0,
         y: float = 0.0,
         color: str = "light_yellow",
+        width: float = 180,
         parent_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Create a sticky note at the given coordinates."""
+        """Create a sticky note at the given coordinates.
+
+        Sticky notes have a fixed aspect ratio in Miro: only `width` can be
+        given (Miro rejects a request that also specifies `height` with
+        "Only height or width should be passed for widgets with fixed
+        aspect ratio"). Miro derives the actual height from `width`.
+        """
         return self.create_item(
             board_id,
             "sticky_note",
             data={"content": content},
             style={"fillColor": color},
             position={"x": x, "y": y, "origin": "center"},
-            geometry={"width": 180},
+            geometry={"width": width},
             parent_id=parent_id,
         )
 

@@ -136,6 +136,14 @@ def test_create_sticky_note(monkeypatch):
     assert body["geometry"] == {"width": 180}
 
 
+def test_create_sticky_note_with_explicit_width(monkeypatch):
+    """create_sticky_note sends only width -- Miro rejects a sticky note request that also
+    specifies height, since sticky notes have a fixed aspect ratio."""
+    client, session = client_for(monkeypatch)
+    client.create_sticky_note("b", "Hello", width=200)
+    assert session.calls[0]["json"]["geometry"] == {"width": 200}
+
+
 def test_create_card_with_assignee(monkeypatch):
     client, session = client_for(monkeypatch)
     client.create_card("b", "T", description="D", assignee_id="9", x=1, y=2)
