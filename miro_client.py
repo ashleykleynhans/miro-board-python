@@ -307,17 +307,27 @@ class MiroClient:
         shape_type: str = "rectangle",
         x: float = 0.0,
         y: float = 0.0,
+        width: float = 160,
+        height: float = 80,
         fill_color: str = "#ffffff",
         border_color: str = "#1a1a1a",
+        parent_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Create a shape (rectangle, circle, triangle, ...)."""
+        """Create a shape (rectangle, circle, triangle, ...).
+
+        Unlike a sticky note, a shape's width and height are independent
+        (no fixed aspect ratio) and its text doesn't get auto-enlarged to
+        fill the box -- useful for a text-heavy box where a sticky note's
+        aggressive auto-fit font sizing causes long lines to wrap.
+        """
         return self.create_item(
             board_id,
             "shape",
             data={"content": content, "shape": shape_type},
             style={"fillColor": fill_color, "borderColor": border_color},
             position={"x": x, "y": y, "origin": "center"},
-            geometry={"width": 160, "height": 80},
+            geometry={"width": width, "height": height},
+            parent_id=parent_id,
         )
 
     def create_frame(

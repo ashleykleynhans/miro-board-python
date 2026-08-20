@@ -221,6 +221,17 @@ def test_create_shape_defaults(monkeypatch):
     body = session.calls[0]["json"]
     assert body["data"] == {"content": "", "shape": "rectangle"}
     assert body["style"] == {"fillColor": "#ffffff", "borderColor": "#1a1a1a"}
+    assert body["geometry"] == {"width": 160, "height": 80}
+
+
+def test_create_shape_with_explicit_width_height_and_parent(monkeypatch):
+    """create_shape accepts independent width/height (no fixed aspect ratio, unlike a sticky
+    note) and can be nested under a parent frame."""
+    client, session = client_for(monkeypatch)
+    client.create_shape("b", "Notes", width=320, height=180, parent_id="frame-1")
+    body = session.calls[0]["json"]
+    assert body["geometry"] == {"width": 320, "height": 180}
+    assert body["parent"] == {"id": "frame-1"}
 
 
 def test_create_frame(monkeypatch):
